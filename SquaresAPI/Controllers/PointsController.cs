@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SquaresAPI.Models;
+using SquaresAPI.Services;
+using System.Collections.Concurrent;
 
 namespace SquaresAPI.Controllers
 {
@@ -8,74 +10,82 @@ namespace SquaresAPI.Controllers
     [ApiController]
     public class PointsController : ControllerBase
     {
-        static private List<Point> points = new List<Point>
-        {
-            new Point
-            {
-                Id = 0,
-                X = -1,
-                Y = 1
-            },
-            new Point
-            {
-                Id = 1,
-                X = 1,
-                Y = 1
-            },
-            new Point
-            {
-                Id = 2,
-                X = 1,
-                Y = -1
-            },
-            new Point
-            {
-                Id = 3,
-                X = -1,
-                Y = -1
-            }
-        };
+        private static readonly ConcurrentDictionary<Guid, PointList> Storage = new();
+        private readonly ISquareFinderService _squareFinder;
 
-        [HttpGet]
-        public ActionResult<List<Point>> GetPoints()
+        public PointsController(ISquareFinderService squareFinder)
         {
-            return Ok(points);
-        }
-
-        [HttpGet("{id}")]
-        public ActionResult<Point> GetPointById(int id) 
-        {
-            var point = points.FirstOrDefault(x => x.Id == id);
-            if (point == null) 
-            {
-                return NotFound();
-            }
-            return Ok(point);
+            _squareFinder = squareFinder;
         }
 
         [HttpPost]
-        public ActionResult<Point> AddPoint(Point newPoint)
+        public ActionResult<PointList> ImportList(List<Point> points)
         {
-            if (newPoint == null)
+            PointList newList = new PointList
             {
-                return BadRequest();
-            }
+                Points = points.DistinctBy(p => (p.X, p.Y)).ToList()
+            };
 
-            points.Add(newPoint);
-            return CreatedAtAction(nameof(GetPointById), new {id=newPoint.Id}, newPoint);
+            Storage[newList.Id] = newList;
+            return CreatedAtAction(nameof(GetList), new { id = newList.Id }, newList);
+
         }
 
-        [HttpDelete("{id}")]
-        public IActionResult DeletePoint(int id)
+        [HttpGet("{id}")]
+        public ActionResult<PointList> GetList(Guid id)
         {
-            var point = points.FirstOrDefault(x => x.Id == id);
-            if (point == null)
+            if (!Storage.TryGetValue(id, out var list))
+                return NotFound();
+
+            return Ok(list);
+        }
+
+        [HttpPost("{id}/points")]
+        public IActionResult AddPoint(Guid id, [FromBody]Point point)
+        {
+            if (!Storage.TryGetValue(id, out var list))
             {
                 return NotFound();
             }
 
-            points.Remove(point);
-            return NoContent();
+            if (!list.Points.Any(p => p.X == point.X && p.Y == point.Y))
+            {
+                list.Points.Add(point);
+            }
+
+            return Ok(list);
         }
+
+        [HttpDelete("{id}/points")]
+        public IActionResult DeletePoint(Guid id, [FromBody]Point point)
+        {
+            if (!Storage.TryGetValue(id, out var list))
+            {
+                return NotFound();
+            }
+
+            list.Points.RemoveAll(p => p.X == point.X && p.Y == point.Y);
+
+            return Ok(list);
+        }
+
+        [HttpGet("{id}/squares")]
+        public ActionResult<SquareResponse> GetSquares(Guid id)
+        {
+            if (!Storage.TryGetValue(id, out var list))
+            {
+                return NotFound();
+            }
+
+            var squares = _squareFinder.FindSquares(list.Points);
+
+            return Ok(new SquareResponse
+            {
+                ListId = id,
+                TotalSquares = squares.Count,
+                Squares = squares
+            });
+        }
+   
     }
 }
