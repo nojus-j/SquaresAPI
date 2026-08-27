@@ -2,10 +2,15 @@
 
 namespace SquaresAPI.Services
 {
+    // I was learning about interface segregation so I decided to implement one here.
+    // It makes it easier to swap out an algorith if I would need to in the future.
     public interface ISquareFinderService
     {
         List<List<Point>> FindSquares(IEnumerable<Point> points);
     }
+    
+    // as the task said I didn't try to invent the wheel so I just looked up the best algorithm
+    // for finding the squares in a 2D plane. In this case I used Pair-Based Edge Verification Algorithm
     public class SquareFinderService : ISquareFinderService
     {
         public List<List<Point>> FindSquares(IEnumerable<Point> points)

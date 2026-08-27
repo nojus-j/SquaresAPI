@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using SquaresAPI.Models;
 using SquaresAPI.Services;
 using System.Collections.Concurrent;
+using SquaresAPI.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace SquaresAPI.Controllers
 {
@@ -10,69 +12,95 @@ namespace SquaresAPI.Controllers
     [ApiController]
     public class PointsController : ControllerBase
     {
-        private static readonly ConcurrentDictionary<Guid, PointList> Storage = new();
+        private readonly AppDbContext _context;
         private readonly ISquareFinderService _squareFinder;
-
-        public PointsController(ISquareFinderService squareFinder)
+        public PointsController(AppDbContext context, ISquareFinderService squareFinder)
         {
+            _context = context;
             _squareFinder = squareFinder;
         }
 
         [HttpPost]
-        public ActionResult<PointList> ImportList(List<Point> points)
+        public async Task<ActionResult<PointList>> ImportList([FromBody] List<Point> points)
         {
-            PointList newList = new PointList
+            var pointList = new PointList
             {
                 Points = points.DistinctBy(p => (p.X, p.Y)).ToList()
             };
 
-            Storage[newList.Id] = newList;
-            return CreatedAtAction(nameof(GetList), new { id = newList.Id }, newList);
+            _context.PointLists.Add(pointList);
+            await _context.SaveChangesAsync();
 
+            return CreatedAtAction(nameof(GetList), new { id = pointList.Id }, pointList);
         }
 
         [HttpGet("{id}")]
-        public ActionResult<PointList> GetList(Guid id)
+        public async Task<ActionResult<PointList>> GetList(Guid id)
         {
-            if (!Storage.TryGetValue(id, out var list))
+            var list = await _context.PointLists
+                .Include(l => l.Points)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (list == null)
+            {
                 return NotFound();
+            }
 
             return Ok(list);
         }
 
         [HttpPost("{id}/points")]
-        public IActionResult AddPoint(Guid id, [FromBody]Point point)
+        public async Task<IActionResult> AddPoint(Guid id, [FromBody]Point point)
         {
-            if (!Storage.TryGetValue(id, out var list))
+            var list = await _context.PointLists
+                .Include(l => l.Points)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (list == null)
             {
                 return NotFound();
             }
 
             if (!list.Points.Any(p => p.X == point.X && p.Y == point.Y))
             {
-                list.Points.Add(point);
+                point.PointListId = id;
+                _context.Points.Add(point);
+                await _context.SaveChangesAsync();
             }
 
             return Ok(list);
         }
 
         [HttpDelete("{id}/points")]
-        public IActionResult DeletePoint(Guid id, [FromBody]Point point)
+        public async Task<IActionResult> DeletePoint(Guid id, [FromBody]Point point)
         {
-            if (!Storage.TryGetValue(id, out var list))
+            var list = await _context.PointLists
+                .Include(l => l.Points)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (list == null)
             {
                 return NotFound();
             }
 
-            list.Points.RemoveAll(p => p.X == point.X && p.Y == point.Y);
+            var pointToRemove = list.Points.FirstOrDefault(p => p.X == point.X && p.Y == point.Y);
+            if (pointToRemove != null)
+            {
+                _context.Points.Remove(pointToRemove);
+                await _context.SaveChangesAsync();
+            }
 
             return Ok(list);
         }
 
         [HttpGet("{id}/squares")]
-        public ActionResult<SquareResponse> GetSquares(Guid id)
+        public async Task<ActionResult<SquareResponse>> GetSquares(Guid id)
         {
-            if (!Storage.TryGetValue(id, out var list))
+            var list = await _context.PointLists
+                .Include(l => l.Points)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (list == null)
             {
                 return NotFound();
             }

@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using SquaresAPI.Data;
 using SquaresAPI.Services;
 
 namespace SquaresAPI
@@ -7,6 +9,8 @@ namespace SquaresAPI
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite("Data Source=squares.db"));
 
             // Add services to the container.
 
