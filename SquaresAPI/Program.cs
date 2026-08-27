@@ -1,4 +1,3 @@
-
 namespace SquaresAPI
 {
     public class Program
@@ -26,7 +25,6 @@ namespace SquaresAPI
             app.UseHttpsRedirection();
 
             app.UseAuthorization();
-
 
             app.MapControllers();
 
