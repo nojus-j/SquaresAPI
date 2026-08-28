@@ -15,6 +15,7 @@ Ensure you have the following installed in your computer:
 ```bash
 git clone [https://github.com/your-username/SquaresAPI.git](https://github.com/your-username/SquaresAPI.git)
 cd SquaresAPI
+```
 
 ### Restore Dependencies
 
