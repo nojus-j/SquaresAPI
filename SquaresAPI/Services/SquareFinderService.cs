@@ -3,7 +3,7 @@
 namespace SquaresAPI.Services
 {
     // I was learning about interface segregation so I decided to implement one here.
-    // It makes it easier to swap out an algorith if I would need to in the future.
+    // It makes it easier to swap out an algorithm if I would need to in the future.
     public interface ISquareFinderService
     {
         List<List<Point>> FindSquares(IEnumerable<Point> points);
